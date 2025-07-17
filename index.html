@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hàbits Saludables</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #fdfcfa;
+      padding: 20px;
+      max-width: 480px;
+      margin: auto;
+      position: relative;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font-size: 0.9em;
+      font-weight: bold;
+      color: #555;
+    }
+    .bottom-icons {
+      display: flex;
+      gap: 10px;
+      
+    }
+    .icon-btn {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    .stats-btn { background-color: black; }
+    .menu-btn::before { content: "🍴"; display: block; text-align: center; }
+    .cart-btn::before { content: "🛒"; display: block; text-align: center; }
+
+    .arrow { font-size: 1.2em; cursor: pointer; padding: 5px; user-select: none; }
+
+    .habit {
+      display: flex;
+      align-items: center;
+      margin: 20px 0;
+    }
+    .circle {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 4px solid;
+      margin-right: 15px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      flex-shrink: 0;
+    }
+    .text { font-size: 1.1em; }
+    .completed { background-color: currentColor; }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0, 0, 0, 0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+      position: relative;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .close-modal {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .checklist li {
+      cursor: pointer;
+      margin: 5px 0;
+    }
+    .checklist li.checked {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    
+    <div class="arrow" id="prevDay">←</div><div id="dateDisplay" style="margin: 0 10px;"></div>
+    <div class="arrow" id="nextDay">→</div>
+  </div>
+
+  <div class="bottom-icons" style="display:flex; justify-content:center; gap:20px; margin-top:30px;">
+    
+  </div>
+
+  <div id="habits"></div>
+  <div class="bottom-icons">
+    <div class="icon-btn stats-btn" id="openStats"></div>
+    <div class="icon-btn menu-btn" id="openMenu"></div>
+    <div class="icon-btn cart-btn" id="openCart" style="display: none;"></div>
+  </div>
+
+  <!-- Modals -->
+  <div class="modal" id="statsModal"><div class="modal-content"><span class="close-modal">✕</span><canvas id="habitChart"></canvas></div></div>
+  <div class="modal" id="menuModal"><div class="modal-content"><span class="close-modal">✕</span><div id="menuContent"></div></div></div>
+  <div class="modal" id="cartModal"><div class="modal-content"><span class="close-modal">✕</span><ul id="cartContent" class="checklist"></ul></div></div>
+
+  <script>
+    const habits = [
+      { color: '#ec1f24', text: 'Caminar 8000 passes', key: 'habit1' },
+      { color: '#f7971e', text: 'Menjar 5 fruites o verdures', key: 'habit2' },
+      { color: '#f5ea16', text: 'Prendre medicació i suplements', key: 'habit3' },
+      { color: '#119a48', text: 'Exercici de força (últimes 72h)', key: 'habit4' },
+      { color: '#3954a3', text: 'Dormir 8h (abans de les 23h)', key: 'habit5' },
+      { color: '#c5278e', text: 'Haver fet 4-7-8', key: 'habit6' }
+    ];
+
+    const menu = [
+      ["Gazpacho i llom planxa amb saltat de xampis", "Crema de verdures i llenguadina o altre peix"],
+      ["Gazpacho i saltat de coliflor", "Pèsols amb bulgur/quinoa"],
+      ["Amanida de llenties", "Ensaladilla rusa i salmó"],
+      ["Endívies amb roquefort i llobarro/orada", "Crema verdures i pollastre rebossat"],
+      ["Amanida de llenties", "Pizza i varitas"],
+      ["Macarrons bolonyesa", "Miniburguers"],
+      ["Menjar fora", ""],
+      ["Saltat de col, ceba, espàrrecs i pollastre la mostassa", "Mongeta tendra amb patates i bonito/verdel"],
+      ["Empedrat de cigrons amb arròs", "Espinacs i truita francesa amb formatge"],
+      ["Amanida verda amb hummus i bistec planxa amb saltat", "Saltat de gall d’indi, bròcoli i arròs"],
+      ["Verdures al forn amb arròs i mandonguilles", "Guacamole i pollastre rebossat"],
+      ["Empedrat de cigrons amb arròs", "Pizza i varitas"],
+      ["Raviolis", "Bocata bo"],
+      ["Menjar fora", ""]
+    ];
+
+    const purchaseDays = {
+      5: [...`Formatge fresc cabra|Pernil|6 ous|2 kg tomàquet|1 cogombre|1 pebrot verd|Coliflor|Espinacs baby|Feta|1 paquet endívies|Roquefort petit|2 bases pizza|2 mozzarela rallada|2 pernil dolç|Pa miniburguers|1 paquet 8 iogurts|1 paquet griegos|1 llonganissa|1 formatge cabra lonchas`.split("|")],
+      12: [...`Formatge fresc cabra|Pernil|6 ous|2 bases pizza|2 mozzarela rallada|2 pernil dolç|8 iogurts|4 griegos|1 formatge lonchas|6 bricks llet|Col (1/4)|Espàrrecs|2 pebrots verds|1 carbassó|Ruca|Cherrys|Bistec|Bròcoli|Aguacate 3 unitats|2 paquets raviolis|2 tomàquets|Mozzarela gran 2 unitats|Paquet tomàquet fregit|Manat cebes tendres|2 paquets champis torcejats G|2 paquets bledes|1 paquet cebes|1 paquet llom 500g|Nabius G|Patates bossa 2kg|Pastanagues 1 bossa|Carbassa 1 paquet|Carbassó 3 unitats|Mongeta verda 2 unitats|Pèsols paquet G|Xocolata amb ametlles|1 paquet virutas pernil (2)|Arròs|Fruits secs 2 paquets|Carn picada mixta 2|Gran esaladilla rusa|2 melva|2 pots llenties|2 llenguadina/gall per totes|4 paquets torrades trigo sarraceno|2 paquets varitas|6 peces salmó|2x llobarro/orada per totes|4x pollastre filet 500g|1 pa rallat paquet|1 paquet macarrons 500g|1 paquet kellogs gran o 2 petits|6 briks llet|Bonito/verdel per 2 dies|4 pots cigrons|Olives anxova s/anxova|Espinacs congelats x2|Gall d’indi per trocets x2 dies`.split("|")],
+      19: [...`Formatge fresc cabra|Pernil|6 ous|2 kg tomàquet|1 cogombre|1 pebrot verd|Coliflor|Espinacs baby|Feta|1 paquet endívies|Roquefort petit|2 bases pizza|2 mozzarela rallada|2 pernil dolç|Pa miniburguers|1 paquet 8 iogurts|1 paquet griegos|1 llonganissa|1 formatge cabra lonchas`.split("|")],
+      26: [...`Formatge fresc cabra|Pernil|6 ous|2 bases pizza|2 mozzarela rallada|2 pernil dolç|8 iogurts|4 griegos|1 formatge lonchas|6 bricks llet|Col (1/4)|Espàrrecs|2 pebrots verds|1 carbassó|Ruca|Cherrys|Bistec|Bròcoli|Aguacate 3 unitats|2 paquets raviolis|2 tomàquets|Mozzarela gran 2 unitats`.split("|")]
+    };
+
+    const months = ["GENER","FEBRER","MARÇ","ABRIL","MAIG","JUNY","JULIOL","AGOST","SETEMBRE","OCTUBRE","NOVEMBRE","DESEMBRE"];
+    let currentDate = new Date();
+    const habitsContainer = document.getElementById('habits');
+    const dateDisplay = document.getElementById('dateDisplay');
+    const prevDayBtn = document.getElementById('prevDay');
+    const nextDayBtn = document.getElementById('nextDay');
+    const statsModal = document.getElementById('statsModal');
+    const menuModal = document.getElementById('menuModal');
+    const cartModal = document.getElementById('cartModal');
+
+    function formatKey(date) {
+      return date.toISOString().split("T")[0];
+    }
+
+    function updateDateDisplay() {
+      dateDisplay.textContent = `${currentDate.getDate()} ${months[currentDate.getMonth()]}`;
+    }
+
+    function updateHabits() {
+      habitsContainer.innerHTML = '';
+      const key = formatKey(currentDate);
+      habits.forEach(h => {
+        const div = document.createElement('div');
+        div.className = 'habit';
+        const circle = document.createElement('div');
+        circle.className = 'circle';
+        circle.style.borderColor = h.color;
+        circle.style.color = h.color;
+        const saved = localStorage.getItem(`${key}-${h.key}`);
+        if (saved === 'true') circle.classList.add('completed');
+        circle.addEventListener('click', () => {
+          const done = circle.classList.toggle('completed');
+          localStorage.setItem(`${key}-${h.key}`, done);
+        });
+        const text = document.createElement('div');
+        text.className = 'text';
+        text.textContent = h.text;
+        div.appendChild(circle);
+        div.appendChild(text);
+        habitsContainer.appendChild(div);
+      });
+    }
+
+    function updateCartIcon() {
+      const day = currentDate.getDay();
+      document.getElementById('openCart').style.display = (day === 5) ? 'block' : 'none';
+    }
+
+    function changeDay(offset) {
+      currentDate.setDate(currentDate.getDate() + offset);
+      updateDateDisplay();
+      updateHabits();
+      updateCartIcon();
+    }
+
+    function dayNumberFromBase(date) {
+      const base = new Date(2025, 6, 14); // 14 juliol 2025
+      const diff = Math.floor((date - base) / (1000 * 60 * 60 * 24));
+      return ((diff % 28) + 28) % 28 + 1;
+    }
+
+    function openMenuModal() {
+      const dayNum = dayNumberFromBase(currentDate);
+      const index = (dayNum - 1) % 14;
+      const [dinar, sopar] = menu[index];
+      document.getElementById('menuContent').innerHTML = `
+        <h3>Menú del dia ${dayNum}</h3>
+        <p><strong>Dinar:</strong> ${dinar}</p>
+        <p><strong>Sopar:</strong> ${sopar}</p>`;
+      menuModal.style.display = 'flex';
+    }
+
+    function openCartModal() {
+      const dayNum = dayNumberFromBase(currentDate);
+      const list = purchaseDays[dayNum] || [];
+      const cart = document.getElementById('cartContent');
+      cart.innerHTML = '';
+      list.forEach((item, i) => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        const itemKey = `cart-${dayNum}-${i}`;
+        if (localStorage.getItem(itemKey) === 'true') li.classList.add('checked');
+        li.addEventListener('click', () => {
+          li.classList.toggle('checked');
+          localStorage.setItem(itemKey, li.classList.contains('checked'));
+        });
+        cart.appendChild(li);
+      });
+      cartModal.style.display = 'flex';
+    }
+
+    function openStatsModal() {
+      statsModal.style.display = 'flex';
+      const ctx = document.getElementById('habitChart').getContext('2d');
+      const days = Array.from({length: 7}, (_, i) => {
+        const d = new Date();
+        d.setDate(currentDate.getDate() - 6 + i);
+        return d;
+      });
+      const labels = days.map(d => d.getDate() + ' ' + months[d.getMonth()].slice(0, 3));
+      const data = days.map(d => {
+        const key = formatKey(d);
+        return habits.reduce((acc, h) => acc + (localStorage.getItem(`${key}-${h.key}`) === 'true' ? 1 : 0), 0);
+      });
+      new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Hàbits completats', data, backgroundColor: '#3954a3' }] },
+        options: { scales: { y: { beginAtZero: true, max: 6 } } }
+      });
+    }
+
+    // Inicialització
+    document.querySelectorAll('.close-modal').forEach(btn => {
+      btn.addEventListener('click', () => btn.parentElement.parentElement.style.display = 'none');
+    });
+
+    document.getElementById('prevDay').addEventListener('click', () => changeDay(-1));
+    document.getElementById('nextDay').addEventListener('click', () => changeDay(1));
+    document.getElementById('openStats').addEventListener('click', openStatsModal);
+    document.getElementById('openMenu').addEventListener('click', openMenuModal);
+    document.getElementById('openCart').addEventListener('click', openCartModal);
+
+    updateDateDisplay();
+    updateHabits();
+    updateCartIcon();
+  </script>
+</body>
+</html>
